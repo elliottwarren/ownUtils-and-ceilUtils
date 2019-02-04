@@ -424,13 +424,32 @@ def binary_search_orig(array, element, lo=0, hi=None):  # can't use a to specify
     pos = bisect_left(array, element, lo, hi)  # find insertion position
     return (pos if pos != hi and array[pos] == element else -1)  # don't walk off the end
 
-def binary_search(array, element, lo=0, hi=None):  # can't use a to specify default for hi
+def binary_search(array, element, lo=0, hi=None):
 
-    # Search through a list  and get idx value out
+    # FAST APPROXIMATE Search through a list and get idx value out
 
     hi = hi if hi is not None else len(array)  # hi defaults to len(a)
     pos = bisect_left(array, element, lo, hi)  # find insertion position
-    return (pos if pos != hi else -1)
+    return (pos if pos != hi else -1) # don't walk off the end
+
+def binary_search_nearest(array, element, lo=0, hi=None):  # can't use a to specify default for hi
+
+    """
+    PRECISE search on a sorted array - far faster than eu.nearest (speed increase is greatest on large arrays).
+
+    bisect_left will return the index where to insert item x in list a, assuming a is sorted. Idx will either be correct
+    or 1 too high. Therefore use abs(array[idx] - element) < abs(array[idx-1] - element) to check and make sure the
+    idx with the nearest value to 'element' is used
+    """
+
+    hi = hi if hi is not None else len(array)  # hi defaults to len(a)
+    pos = bisect_left(array, element, lo, hi)
+    idx = (pos if pos != hi else -1) # find insertion position
+
+    if abs(array[idx] - element) < abs(array[idx-1] - element):
+        return idx
+    else:
+        return idx-1
 
 # statistics
 
@@ -647,12 +666,16 @@ def date_range(start_date, end_date, increment, period):
     """
 
     # replace period string with plural, if it was singlar
+    # function cannot do hours so convert it to minutes
     if period == 'day':
         period = 'days'
     elif period == 'minute':
         period = 'minutes'
     elif period == 'second':
         period = 'seconds'
+    elif period == 'hour':
+        period = 'minutes'
+        increment *= 60.0
 
     from dateutil.relativedelta import relativedelta
 
@@ -895,9 +918,36 @@ def add_at(ax, text, loc=2, size=10):
     from mpl_toolkits.axes_grid.anchored_artists import AnchoredText
 
     fp = dict(size=size)
-    _at = AnchoredText(text, loc=loc, prop=fp)
+    _at = AnchoredText(text, loc=loc, prop=fp, frameon=False)
     ax.add_artist(_at)
     return _at
+
+def discrete_colour_map(lower_bound, upper_bound, spacing):
+
+    """Create a discrete colour map"""
+
+    import matplotlib.pyplot as plt
+    import matplotlib as mpl
+
+    # jet by default
+    # if cmap == '':
+    #     cmap = plt.cm.jet
+    cmap = plt.cm.viridis
+    cmap = plt.cm.jet
+
+    # extract all colors from the .jet map
+    #cmaplist = [cmap(i) for i in range(cmap.N)]
+    cmaplist = [cmap(i) for i in range(cmap.N)]
+    # force the first color entry to be grey
+    # cmaplist[0] = (.5, .5, .5, 1.0)
+    # create the new map
+    cmap22 = cmap.from_list('Custom cmap', cmaplist, cmap2.N)
+
+    # define the bins and normalize
+    bounds = np.linspace(lower_bound, upper_bound, spacing)
+    norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
+
+    return cmap, norm
 
 # other
 
