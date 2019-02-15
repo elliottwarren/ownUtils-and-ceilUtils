@@ -20,9 +20,9 @@ def get_all_varaible_names(datapath):
 
     from os.path import isfile
     from netCDF4 import Dataset
-
+    
     datafile = Dataset(datapath, 'r')
-
+    
     all_vars = datafile.variables
     # convert from unicode to strings
     all_vars = [str(i) for i in all_vars]
@@ -118,13 +118,13 @@ def netCDF_read(datapaths,vars='',timezone='UTC', returnRawTime=False, skip_miss
             vars = [vars]
         except TypeError:
             print 'Variables need to be a list of strings or '' to read all variables'
-
+    
     if type(datapaths) != list:
         try:
             datapaths = [datapaths]
         except TypeError:
             print 'Datapaths need to be either a singular or list of strings'
-
+    
     # find first existing datapath in [datapaths]
     first_file = []
     for i, d in enumerate(datapaths):
@@ -132,14 +132,16 @@ def netCDF_read(datapaths,vars='',timezone='UTC', returnRawTime=False, skip_miss
             if isfile(d):
                 first_file = d
                 datapaths = datapaths[i:]
-
+    
     # if no specific variables were given, find all the variable names within the first netCDF file
     if vars[0] == '':
+        # ['latitude', 'longitude', 'time', 'model_level_number', 'level_height', 'level_sigma', 
+        # 'air_temperature', 'specific_humidity', 'air_pressure', 'aerosol_for_visibility']
         vars = get_all_varaible_names(first_file)
-
+    
     # Read
     # -----------
-
+    
     # define array
     raw = {}
 
@@ -161,7 +163,9 @@ def netCDF_read(datapaths,vars='',timezone='UTC', returnRawTime=False, skip_miss
 
                 # Extract data and remove single dimension entries at the same time
                 for i in vars:
-                    raw[i] = np.squeeze(datafile.variables[i][:])
+
+#                     raw[i] = np.squeeze(datafile.variables[i][:])
+                    raw[i] = datafile.variables[i][:]
 
                     # if masked array, convert to np.array
                     if isinstance(raw[i],np.ma.MaskedArray):
@@ -187,7 +191,8 @@ def netCDF_read(datapaths,vars='',timezone='UTC', returnRawTime=False, skip_miss
                 # Extract data and remove single dimension entries at the same time
                 for i in vars:
 
-                    var_data = np.squeeze(datafile.variables[i][:])
+#                     var_data = np.squeeze(datafile.variables[i][:])
+                    var_data = datafile.variables[i][:]
 
                     # if masked array, convert to np.array
                     if isinstance(var_data, np.ma.MaskedArray):
@@ -203,12 +208,14 @@ def netCDF_read(datapaths,vars='',timezone='UTC', returnRawTime=False, skip_miss
 
 
                 if 'time' in raw:
-                    todayRawTime = np.squeeze(datafile.variables['time'][:])
+#                     todayRawTime = np.squeeze(datafile.variables['time'][:])
+                    todayRawTime = datafile.variables['time'][:]
                     tstr = datafile.variables['time'].units
                     # append to stored 'protime' after converting just todays time
                     raw['protime'] = np.append(raw['protime'], time_to_datetime(tstr, todayRawTime))
                 elif 'forecast_time' in raw:
-                    todayRawTime = np.squeeze(datafile.variables['forecast_time'][:])
+#                     todayRawTime = np.squeeze(datafile.variables['forecast_time'][:])
+                    todayRawTime = datafile.variables['forecast_time'][:]
                     tstr = datafile.variables['forecast_time'].units
                     raw['protime'] = np.append(raw['protime'], time_to_datetime(tstr, todayRawTime))
 
@@ -698,12 +705,12 @@ def time_to_datetime(tstr, timeRaw):
     """
 
     import datetime as dt
-
+    
     # sort out times and turn into datetimes
     # tstr = datafile.variables['time'].units
     tstr = tstr.replace('-', ' ')
     tstr = tstr.split(' ')
-
+    
     # Datetime
     # ---------------
     # create list of datetimes for export
@@ -713,20 +720,21 @@ def time_to_datetime(tstr, timeRaw):
     # get delta times from the start date
     # time: time in minutes since the start time (taken from netCDF file)
     if tstr[0] == 'seconds':
-        delta = [dt.timedelta(seconds = int(timeRaw[i])) for i in np.arange(0, len(timeRaw))]
+        delta = [dt.timedelta(seconds = int(timeRaw[i])) for i in np.arange(0, timeRaw.size)] # len(timeRaw)
 
     elif tstr[0] == 'minutes':
-        delta = [dt.timedelta(seconds=timeRaw[i]*60) for i in np.arange(0, len(timeRaw))]
+        delta = [dt.timedelta(seconds=timeRaw[i]*60) for i in np.arange(0, timeRaw.size)]
 
     elif tstr[0] == 'hours':
-        delta = [dt.timedelta(seconds=timeRaw[i]*3600) for i in np.arange(0, len(timeRaw))]
+        # delta = [dt.timedelta(seconds=timeRaw[i]*3600) for i in np.arange(0, timeRaw.size)]
+        delta = [dt.timedelta(seconds=t*3600) for t in timeRaw]
 
     elif tstr[0] == 'days':
-        delta = [dt.timedelta(days=timeRaw[i]) for i in np.arange(0, len(timeRaw))]
+        delta = [dt.timedelta(days=timeRaw[i]) for i in np.arange(0, timeRaw.size)]
 
 
     if 'delta' in locals():
-        return [start + delta[i] for i in np.arange(0, len(timeRaw))]
+        return [start + delta[i] for i in np.arange(0, timeRaw.size)]
     else:
         print 'Raw time not in seconds, minutes, hours or days. No processed time created.'
         return
