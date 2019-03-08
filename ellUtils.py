@@ -89,7 +89,7 @@ def netCDF_info(datapath):
     return
 
 #ToDo need to sort time out. Currently time gets processed even if it is not in vars. Need an if statement or two...
-def netCDF_read(datapaths,vars='',timezone='UTC', returnRawTime=False, skip_missing_files=False):
+def netCDF_read(datapaths,vars='',timezone='UTC', returnRawTime=False, skip_missing_files=False, **kwargs):
 
     """
     Read in any variables for any netcdf. If vars are not given, read in all the data
@@ -99,7 +99,11 @@ def netCDF_read(datapaths,vars='',timezone='UTC', returnRawTime=False, skip_miss
 
     kwargs
     :param height: instrument height
+    :param single_height_only (bool, requires scaler_height to work): Extract data for a single height
+    :param height_extract_idx (int, requires single_height_only=True): which height_idx to extract
+    
     :return: raw (dictionary)
+
     """
 
     from netCDF4 import Dataset
@@ -139,6 +143,11 @@ def netCDF_read(datapaths,vars='',timezone='UTC', returnRawTime=False, skip_miss
         # 'air_temperature', 'specific_humidity', 'air_pressure', 'aerosol_for_visibility']
         vars = get_all_varaible_names(first_file)
     
+#     # variables with a height dimension
+#     fourD_vars_with_height = ['air_temperature', 'specific_humidity', 'air_pressure', 'aerosol_for_visibility']
+# 
+#     oneD_vars_with_height = ['model_level_number', 'level_height', 'level_sigma']
+    
     # Read
     # -----------
     
@@ -146,11 +155,6 @@ def netCDF_read(datapaths,vars='',timezone='UTC', returnRawTime=False, skip_miss
     raw = {}
 
     for j, d in enumerate(datapaths):
-
-        # debugging code
-        #if j in range(0, 3000, 100):
-        #   print d
-        # print d
 
         # check file ecists. Raise error if all files need to be present (skip_missing_files == False)
         if (os.path.isfile(d) == False) and (skip_missing_files == False):
@@ -164,8 +168,28 @@ def netCDF_read(datapaths,vars='',timezone='UTC', returnRawTime=False, skip_miss
                 # Extract data and remove single dimension entries at the same time
                 for i in vars:
 
-#                     raw[i] = np.squeeze(datafile.variables[i][:])
-                    raw[i] = datafile.variables[i][:]
+                    if 'height_extract_idx' in kwargs:
+                        
+                        # dimension names - use to check if 'height' is present
+                        dims = np.array([str(j) for j in datafile.variables[i].dimensions])
+                        # is there a height dimension in this particular var?
+                        # if not, extract all data (assuming var is something like 'time')
+                        if 'height' in dims:# | ('model_level' in dims) | ('sigma' in dims):
+                            # [] around height_idx keeps the dimension
+                            # height_dim = np.where(dims == 'height')[0][0]                            
+                            height_dim = np.where(dims == 'height')[0][0]
+                            
+                            # fast extraction method - keep the original number of dimensions
+                            shp = list(datafile.variables[i].shape) # get current shape (n-dim)
+                            extract_idx = [np.arange(j) for j in shp] # create full idx ranges for each dim by default
+                            extract_idx[height_dim] = [kwargs['height_extract_idx']] # change the height dimension to just be height_idx, [height_idx] keeps dimension
+                            raw[i] = datafile.variables[i][extract_idx] # take the data from netCDF file
+                            
+                        else:
+                            raw[i] = datafile.variables[i][:]
+
+                    else:
+                        raw[i] = datafile.variables[i][:]
 
                     # if masked array, convert to np.array
                     if isinstance(raw[i],np.ma.MaskedArray):
@@ -191,8 +215,23 @@ def netCDF_read(datapaths,vars='',timezone='UTC', returnRawTime=False, skip_miss
                 # Extract data and remove single dimension entries at the same time
                 for i in vars:
 
-#                     var_data = np.squeeze(datafile.variables[i][:])
-                    var_data = datafile.variables[i][:]
+                    if 'height_extract_idx' in kwargs:
+
+                        # get dimension names
+                        dims = np.array([str(j) for j in datafile.variables[i].dimensions])
+                        # is there a height dimension in this particular var?
+                        # if not, extract all data (assuming var is something like 'time')
+                        if ('height' in dims) | ('model_level' in dims) | ('sigma' in dims):
+                            # [] around height_idx keeps the dimension
+                            height_dim = np.where(dims == 'height')[0][0]
+                            
+                            # fast extraction method - keep the original number of dimensions
+                            shp = list(datafile.variables[i].shape) # get current shape (n-dim)
+                            extract_idx = [np.arange(j) for j in shp] # create full idx ranges for each dim by default
+                            extract_idx[height_dim] = [kwargs['height_extract_idx']] # change the height dimension to just be height_idx
+                            raw[i] = datafile.variables[i][extract_idx] # take the data from netCDF file
+                    else:
+                        raw[i] = datafile.variables[i][:]
 
                     # if masked array, convert to np.array
                     if isinstance(var_data, np.ma.MaskedArray):
