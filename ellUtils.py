@@ -20,8 +20,12 @@ def get_all_varaible_names(datapath):
 
     from os.path import isfile
     from netCDF4 import Dataset
-    
+
+    #try:
+    print datapath
     datafile = Dataset(datapath, 'r')
+    #except:
+    #print 'file not present/issue with file: '+datapath
     
     all_vars = datafile.variables
     # convert from unicode to strings
@@ -60,7 +64,7 @@ def netCDF_info(datapath):
     """
 
     from netCDF4 import Dataset#
-    datafile = Dataset(datapath,'r')
+    datafile = Dataset(datapath,'r+')
 
     # headers
     print ''
@@ -88,7 +92,6 @@ def netCDF_info(datapath):
 
     return
 
-#ToDo need to sort time out. Currently time gets processed even if it is not in vars. Need an if statement or two...
 def netCDF_read(datapaths,vars='',timezone='UTC', returnRawTime=False, skip_missing_files=False, **kwargs):
 
     """
@@ -98,16 +101,13 @@ def netCDF_read(datapaths,vars='',timezone='UTC', returnRawTime=False, skip_miss
     :param vars: (list of strings)
 
     kwargs
-    :param height: instrument height
-    :param single_height_only (bool, requires scaler_height to work): Extract data for a single height
     :param height_extract_idx (int, requires single_height_only=True): which height_idx to extract
-    
+
     :return: raw (dictionary)
 
     """
 
     from netCDF4 import Dataset
-    #from netCDF4 import MFDataset
     import numpy as np
     import datetime as dt
     from os.path import isfile
@@ -122,13 +122,13 @@ def netCDF_read(datapaths,vars='',timezone='UTC', returnRawTime=False, skip_miss
             vars = [vars]
         except TypeError:
             print 'Variables need to be a list of strings or '' to read all variables'
-    
+
     if type(datapaths) != list:
         try:
             datapaths = [datapaths]
         except TypeError:
             print 'Datapaths need to be either a singular or list of strings'
-    
+
     # find first existing datapath in [datapaths]
     first_file = []
     for i, d in enumerate(datapaths):
@@ -136,21 +136,14 @@ def netCDF_read(datapaths,vars='',timezone='UTC', returnRawTime=False, skip_miss
             if isfile(d):
                 first_file = d
                 datapaths = datapaths[i:]
-    
+
     # if no specific variables were given, find all the variable names within the first netCDF file
     if vars[0] == '':
-        # ['latitude', 'longitude', 'time', 'model_level_number', 'level_height', 'level_sigma', 
-        # 'air_temperature', 'specific_humidity', 'air_pressure', 'aerosol_for_visibility']
         vars = get_all_varaible_names(first_file)
-    
-#     # variables with a height dimension
-#     fourD_vars_with_height = ['air_temperature', 'specific_humidity', 'air_pressure', 'aerosol_for_visibility']
-# 
-#     oneD_vars_with_height = ['model_level_number', 'level_height', 'level_sigma']
-    
+
     # Read
     # -----------
-    
+
     # define array
     raw = {}
 
@@ -169,22 +162,22 @@ def netCDF_read(datapaths,vars='',timezone='UTC', returnRawTime=False, skip_miss
                 for i in vars:
 
                     if 'height_extract_idx' in kwargs:
-                        
+
                         # dimension names - use to check if 'height' is present
                         dims = np.array([str(j) for j in datafile.variables[i].dimensions])
                         # is there a height dimension in this particular var?
                         # if not, extract all data (assuming var is something like 'time')
                         if 'height' in dims:# | ('model_level' in dims) | ('sigma' in dims):
                             # [] around height_idx keeps the dimension
-                            # height_dim = np.where(dims == 'height')[0][0]                            
+                            # height_dim = np.where(dims == 'height')[0][0]
                             height_dim = np.where(dims == 'height')[0][0]
-                            
+
                             # fast extraction method - keep the original number of dimensions
                             shp = list(datafile.variables[i].shape) # get current shape (n-dim)
                             extract_idx = [np.arange(j) for j in shp] # create full idx ranges for each dim by default
                             extract_idx[height_dim] = [kwargs['height_extract_idx']] # change the height dimension to just be height_idx, [height_idx] keeps dimension
                             raw[i] = datafile.variables[i][extract_idx] # take the data from netCDF file
-                            
+
                         else:
                             raw[i] = datafile.variables[i][:]
 
@@ -224,7 +217,7 @@ def netCDF_read(datapaths,vars='',timezone='UTC', returnRawTime=False, skip_miss
                         if ('height' in dims) | ('model_level' in dims) | ('sigma' in dims):
                             # [] around height_idx keeps the dimension
                             height_dim = np.where(dims == 'height')[0][0]
-                            
+
                             # fast extraction method - keep the original number of dimensions
                             shp = list(datafile.variables[i].shape) # get current shape (n-dim)
                             extract_idx = [np.arange(j) for j in shp] # create full idx ranges for each dim by default
@@ -245,15 +238,12 @@ def netCDF_read(datapaths,vars='',timezone='UTC', returnRawTime=False, skip_miss
 
                     raw[i] = np.append(raw[i], var_data)
 
-
                 if 'time' in raw:
-#                     todayRawTime = np.squeeze(datafile.variables['time'][:])
                     todayRawTime = datafile.variables['time'][:]
                     tstr = datafile.variables['time'].units
                     # append to stored 'protime' after converting just todays time
                     raw['protime'] = np.append(raw['protime'], time_to_datetime(tstr, todayRawTime))
                 elif 'forecast_time' in raw:
-#                     todayRawTime = np.squeeze(datafile.variables['forecast_time'][:])
                     todayRawTime = datafile.variables['forecast_time'][:]
                     tstr = datafile.variables['forecast_time'].units
                     raw['protime'] = np.append(raw['protime'], time_to_datetime(tstr, todayRawTime))
@@ -719,7 +709,7 @@ def date_range(start_date, end_date, increment, period):
         period = 'minutes'
     elif period == 'second':
         period = 'seconds'
-    elif period == 'hour':
+    elif (period == 'hour') | (period == 'hours'):
         period = 'minutes'
         increment *= 60.0
 
@@ -950,7 +940,7 @@ def linear_fit_plot(x, y, ax, ls = '-', color = 'black'):
 
     return m, b
 
-def add_at(ax, text, loc=2, size=10):
+def add_at(ax, text, loc=2, size=10, frameon=False):
 
     """
     Add a label to the plot. Used for alphabetising subplots. Automatically label in the top left
@@ -965,13 +955,17 @@ def add_at(ax, text, loc=2, size=10):
     from mpl_toolkits.axes_grid.anchored_artists import AnchoredText
 
     fp = dict(size=size)
-    _at = AnchoredText(text, loc=loc, prop=fp, frameon=False)
+    _at = AnchoredText(text, loc=loc, prop=fp, frameon=frameon, borderpad=0.0)
     ax.add_artist(_at)
     return _at
 
 def discrete_colour_map(lower_bound, upper_bound, spacing):
 
-    """Create a discrete colour map"""
+    """Create a discrete colour map
+
+    Usage of cmap and norm example:
+    scat = ax.scatter(x, y, c=tag, s=np.random.randint(100, 500, 20), cmap=cmap, norm=norm)
+    """
 
     import matplotlib.pyplot as plt
     import matplotlib as mpl
@@ -988,7 +982,7 @@ def discrete_colour_map(lower_bound, upper_bound, spacing):
     # force the first color entry to be grey
     # cmaplist[0] = (.5, .5, .5, 1.0)
     # create the new map
-    cmap22 = cmap.from_list('Custom cmap', cmaplist, cmap2.N)
+    cmap = cmap.from_list('Custom cmap', cmaplist, cmap.N)
 
     # define the bins and normalize
     bounds = np.linspace(lower_bound, upper_bound, spacing)
