@@ -22,10 +22,10 @@ def get_all_varaible_names(datapath):
     from netCDF4 import Dataset
 
     #try:
-    print datapath
+    print(datapath)
     datafile = Dataset(datapath, 'r')
     #except:
-    #print 'file not present/issue with file: '+datapath
+    #print('file not present/issue with file: '+datapath)
     
     all_vars = datafile.variables
     # convert from unicode to strings
@@ -67,8 +67,8 @@ def netCDF_info(datapath):
     datafile = Dataset(datapath,'r+')
 
     # headers
-    print ''
-    print '[name, units, shape]'
+    print('')
+    print('[name, units, shape]')
 
     for i in datafile.variables:
 
@@ -85,8 +85,8 @@ def netCDF_info(datapath):
 
         meta += [datafile.variables[i].shape]
 
-        print [i] + meta
-        # print [i,datafile.variables[i].units,datafile.variables[i].shape]
+        print([i] + meta)
+        # print([i,datafile.variables[i].units,datafile.variables[i].shape])
 
     datafile.close()
 
@@ -121,13 +121,13 @@ def netCDF_read(datapaths,vars='',timezone='UTC', returnRawTime=False, skip_miss
         try:
             vars = [vars]
         except TypeError:
-            print 'Variables need to be a list of strings or '' to read all variables'
+            print('Variables need to be a list of strings or '' to read all variables')
 
     if type(datapaths) != list:
         try:
             datapaths = [datapaths]
         except TypeError:
-            print 'Datapaths need to be either a singular or list of strings'
+            print('Datapaths need to be either a singular or list of strings')
 
     # find first existing datapath in [datapaths]
     first_file = []
@@ -271,6 +271,68 @@ def netCDF_read(datapaths,vars='',timezone='UTC', returnRawTime=False, skip_miss
     datafile.close()
 
     return raw
+
+def dump(obj):
+
+    """
+    Dump all object's attributes to screen
+    :param obj:
+    :return:
+    """
+
+    for attr in dir(obj):
+        if hasattr(obj, attr):
+            print("obj.%s = %s" % (attr, getattr(obj, attr)))
+
+    return
+
+def mule_sub(filename1, filename2, outfilename):
+
+    """
+    filename1 - filename2 (all fields except the land-sea mask)
+    :param filename1:
+    :param filename2:
+    :param outfilename:
+    :return:
+    """
+
+    # # if no output name give, just output it into the same directory and where the filename1 is, with a generic name
+    # if outfilename == '':
+    #     filename1.ind('\\')
+
+    from mule.operators import SubtractFieldsOperator
+
+    subtract_operator = SubtractFieldsOperator()
+
+    # ff1 = mule.FieldsFile.from_file(filename1)
+    # ff2 = mule.FieldsFile.from_file(filename2)
+
+    ff1 = mule.UMFile.from_file(filename1)
+    ff2 = mule.UMFile.from_file(filename2)
+
+    ff_out = ff1.copy()
+
+    for field_1 in ff1.fields:
+        if field_1.lbrel in (2, 3) and field_1.lbuser4 != 30:
+            for field_2 in list(ff2.fields):
+                if field_2.lbrel not in (2, 3):
+                    ff2.fields.remove(field_2)
+                    continue
+                elif ((field_1.lbuser4 == field_2.lbuser4) and
+                      #(field_1.lbft == field_2.lbft) and     # matching forecast times not necessary
+                      (field_1.lblev == field_2.lblev)):
+                    ff_out.fields.append(subtract_operator([field_1, field_2]))
+                    ff2.fields.remove(field_2)
+                    break
+            else:
+                ff_out.fields.append(field_1)
+        else:
+            ff_out.fields.append(field_1)
+
+    ff_out.to_file(outfilename)
+
+
+    return
 
 # processing
 
@@ -450,7 +512,6 @@ def linear_interpolation(y):
     y[nans] = np.interp(x(nans), x(~nans), y[~nans])
 
     return y
-
 
 def binary_search_orig(array, element, lo=0, hi=None):  # can't use a to specify default for hi
 
@@ -678,8 +739,11 @@ def dateList_to_datetime(dayList):
 
     """ Convert list of string dates into datetimes - very rigid methodology """
     from numpy import array
-
-    datetimeDays = array([dt.datetime(int(d[0:4]), int(d[4:6]), int(d[6:8])) for d in dayList])
+    if len(dayList[0]) == 8:
+        datetimeDays = array([dt.datetime(int(d[0:4]), int(d[4:6]), int(d[6:8])) for d in dayList])
+    elif len(dayList[0]) == 12:
+        datetimeDays = array([dt.datetime(int(d[0:4]), int(d[4:6]), int(d[6:8]),
+                                          int(d[8:10], int(d[10:12]))) for d in dayList])
 
     return datetimeDays
 
@@ -765,7 +829,7 @@ def time_to_datetime(tstr, timeRaw):
     if 'delta' in locals():
         return [start + delta[i] for i in np.arange(0, timeRaw.size)]
     else:
-        print 'Raw time not in seconds, minutes, hours or days. No processed time created.'
+        print('Raw time not in seconds, minutes, hours or days. No processed time created.')
         return
 
 def time_match_datasets(xdata, ydata):
@@ -822,11 +886,11 @@ def time_match_datasets(xdata, ydata):
                     try:
                         data_pro[key][t_idx] = data[key][n_idx]
                     except:
-                        print data.keys()
-                        print data_pro.keys()
-                        print key
-                        print t_idx
-                        print n_idx
+                        print(data.keys())
+                        print(data_pro.keys())
+                        print(key)
+                        print(t_idx)
+                        print(n_idx)
                         data_pro[key][t_idx] = data[key][n_idx]
 
         return data_pro
