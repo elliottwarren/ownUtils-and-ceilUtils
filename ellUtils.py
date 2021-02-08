@@ -63,7 +63,7 @@ def netCDF_info(datapath):
     :return: printed list of variables, dimensions and units
     """
 
-    from netCDF4 import Dataset#
+    from netCDF4 import Dataset
     datafile = Dataset(datapath,'r+')
 
     # headers
@@ -286,6 +286,54 @@ def dump(obj):
 
     return
 
+# processing
+
+def field_calc_lons_lats(field):
+
+    """
+    Calculate the latitude and longitude cell center and corner positions
+
+    :param fields:
+
+    :return lat
+    :return lon
+    :return lat_corners
+    :return lon_corners
+    """
+
+    # Longitude and latitude
+    # Following code works on regular grids only. Needs expanding for non-regular grids
+    if field.lbcode == 1:  # regular lon/lat grid
+        lat_0 = field.bzy  # first lat point
+        lat_spacing = field.bdy  # lat spacing
+        #lat_len = fields_data[0].shape[0]  # number of rows
+        lat_len = field.lbrow  # number of rows
+        lon_0 = field.bzx
+        lon_spacing = field.bdx
+        lon_len = field.lbnpt
+
+        # Recreate the lon lat vectors (checked against xconv output)
+        # Center coordinates of each cell
+        lat = ((np.arange(lat_len) + 1) * lat_spacing) + lat_0
+        lon = ((np.arange(lon_len) + 1) * lon_spacing) + lon_0
+
+        # Corner coords of each cell (starting with bottom left, needed for plt.pcolormesh)
+        lat_corners = np.append(lat - (0.5 * lat_spacing), lat[-1] + (0.5 * lat_spacing))
+        lon_corners = np.append(lon - (0.5 * lon_spacing), lon[-1] + (0.5 * lon_spacing))
+
+    else:
+        print('Non-regular grid plotting not yet available - longitude and latitude will simply be index '
+              'position')
+
+        lat = np.arange(field.lbrow)
+        lon = np.arange(field.lbnpt)
+
+        lat_corners = np.arange(field.lbrow+1)
+        lon_corners = np.arange(field.lbnpt+1)
+
+
+    return lat, lon, lat_corners, lon_corners
+
 def mule_sub(filename1, filename2, outfilename):
 
     """
@@ -331,10 +379,8 @@ def mule_sub(filename1, filename2, outfilename):
 
     ff_out.to_file(outfilename)
 
-
     return
 
-# processing
 
 def dec_round(a, decimals=1):
 
@@ -364,7 +410,8 @@ def to_percent(y, position):
     else:
         return s + '%'     
     
-#==============================================================================
+# ==============================================================================
+
 
 def nearestDate(dates, pivot):
 
@@ -513,6 +560,7 @@ def linear_interpolation(y):
 
     return y
 
+
 def binary_search_orig(array, element, lo=0, hi=None):  # can't use a to specify default for hi
 
     # Search through a list  and get idx value out
@@ -521,6 +569,7 @@ def binary_search_orig(array, element, lo=0, hi=None):  # can't use a to specify
     pos = bisect_left(array, element, lo, hi)  # find insertion position
     return (pos if pos != hi and array[pos] == element else -1)  # don't walk off the end
 
+
 def binary_search(array, element, lo=0, hi=None):
 
     # FAST APPROXIMATE Search through a list and get idx value out
@@ -528,6 +577,7 @@ def binary_search(array, element, lo=0, hi=None):
     hi = hi if hi is not None else len(array)  # hi defaults to len(a)
     pos = bisect_left(array, element, lo, hi)  # find insertion position
     return (pos if pos != hi else -1) # don't walk off the end
+
 
 def binary_search_nearest(array, element, lo=0, hi=None):  # can't use a to specify default for hi
 
@@ -548,9 +598,11 @@ def binary_search_nearest(array, element, lo=0, hi=None):  # can't use a to spec
     else:
         return idx-1
 
+
 # statistics
 
 def croscorr(data1, data2, normalise=False):
+
     """
     #==============================================================================
     # 1. Normalised cross correlation with NaNs present
@@ -663,12 +715,14 @@ def croscorr(data1, data2, normalise=False):
     # return cross correlation vector
     return crscor
 
+
 def moving_average_old(a, n):
     from numpy import cumsum
 
     ret = cumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
     return ret[n - 1:] / n
+
 
 def pstar(p):
 
@@ -687,7 +741,9 @@ def pstar(p):
 
     return p_star
 
+
 # distributions
+
 
 def normpdf(x, mean, sd):
 
@@ -710,30 +766,9 @@ def normpdf(x, mean, sd):
 
     return num / denom
 
-def inv_normpdf(x, mean, sd):
-
-    """
-    Gives the probability of y, given a value of x, assuming a gaussian distribution
-    :param x:
-    :param mean:
-    :param sd:
-    :return:
-
-    unit of p(y) is a fraction
-    """
-
-    from math import exp
-
-    var = float(sd) ** 2
-    pi = 3.1415926
-    denom = (2 * pi * var) ** .5
-    num = exp(-(float(x) - float(mean)) ** 2 / (2 * var))
-
-    
-
-    return num / denom
 
 # datetime processing
+
 
 def dateList_to_datetime(dayList):
 
@@ -746,6 +781,7 @@ def dateList_to_datetime(dayList):
                                           int(d[8:10], int(d[10:12]))) for d in dayList])
 
     return datetimeDays
+
 
 def date_range(start_date, end_date, increment, period):
 
@@ -786,6 +822,7 @@ def date_range(start_date, end_date, increment, period):
         result.append(nxt)
         nxt += delta
     return np.array(result)
+
 
 def time_to_datetime(tstr, timeRaw):
 
@@ -831,6 +868,7 @@ def time_to_datetime(tstr, timeRaw):
     else:
         print('Raw time not in seconds, minutes, hours or days. No processed time created.')
         return
+
 
 def time_match_datasets(xdata, ydata):
 
@@ -973,6 +1011,7 @@ def fig_majorAxis(fig):
 
     return ax
 
+
 def invisible_axis(ax):
 
     """
@@ -991,6 +1030,7 @@ def invisible_axis(ax):
 
     return ax
 
+
 def linear_fit_plot(x, y, ax, ls = '-', color = 'black'):
 
     # make sure they are np arrays so idx can be an array of values
@@ -1003,6 +1043,7 @@ def linear_fit_plot(x, y, ax, ls = '-', color = 'black'):
     ax.plot(np.array([-100,100]), m * np.array([-100,100]) + b, ls = ls, color = color)
 
     return m, b
+
 
 def add_at(ax, text, loc=2, size=10, frameon=False):
 
@@ -1022,6 +1063,7 @@ def add_at(ax, text, loc=2, size=10, frameon=False):
     _at = AnchoredText(text, loc=loc, prop=fp, frameon=frameon, borderpad=0.0)
     ax.add_artist(_at)
     return _at
+
 
 def discrete_colour_map(lower_bound, upper_bound, spacing):
 
@@ -1055,6 +1097,7 @@ def discrete_colour_map(lower_bound, upper_bound, spacing):
     return cmap, norm
 
 # other
+
 
 def ensure_dir(file_path):
 
