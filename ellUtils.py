@@ -1099,20 +1099,14 @@ def discrete_colour_map(lower_bound, upper_bound, spacing):
 # other
 
 
-def ensure_dir(file_path):
+def ensure_dir(directory):
 
-    """
-    create directory if one does not already exist
-    http://stackoverflow.com/questions/273192/how-to-check-if-a-directory-exists-and-create-it-if-necessary
-    copied 24/02/17
-    :param file_path:
-    :return:
-    """
+    """Ensure directory exists. Create it if it's not there already"""
 
-    import os
+    from os import system
+    from os.path import exists
 
-    directory = os.path.dirname(file_path)
-    if not os.path.exists(directory):
-        os.makedirs(directory)
+    if not exists(directory):
+        system('mkdir -p ' + directory)
 
     return
